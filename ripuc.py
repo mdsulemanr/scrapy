@@ -7,88 +7,57 @@ class RipucSpider(scrapy.Spider):
     allowed_domains = ['ripuc.org']
     start_urls = ['http://www.ripuc.org/eventsactions/docket.html']
 
+    def row_data(self, row, table):
+        docket = row.xpath('td[1]/a/text()|td[1]/text()').extract()
+        filer = row.xpath('td[2]/p/text()|td[2]/text()').extract()
+        description = row.xpath('td[3]/p/text()|td[3]/span/text()|td[3]/text()').extract()
+        return docket, filer, description
+
     def parse(self, response):
         table = response.xpath('//td[@class="normal"]/table')
-        number_of_rows = int(float(table.xpath('count(tr)').extract_first()))
+        same_filer = 0
+        same_description = 0
+        for row in table.xpath('tr')[1:]:
+            # Unique Docket, Filer and Description
+            if row.xpath('count(td)=3 and not(td[1][@rowspan="2"]) and not(td[2][@rowspan="2"])').extract_first()=='1':
+                docket, filer, description = self.row_data(row, table)
 
-        for i in range(2, number_of_rows+1):
-            if table.xpath('tr[{}]/td[@rowspan="2"][1]/a/text()'.format(i)).extract():
-                docket = table.xpath('tr[{}]/td[@rowspan="2"][1]/a/text()'.format(i)).extract()
+            # Dependent Docket and unique Filer and Description
+            elif row.xpath('count(td)=3 and td[1][@rowspan="2"]').extract_first()=='1':
+                docket, filer, description = self.row_data(row, table)
 
-                if table.xpath('tr[{}]/td[2]/p/text()'.format(i)).extract():
-                    filer = table.xpath('tr[{}]/td[2]/p/text()'.format(i)).extract()
-                else:
-                    filer= table.xpath('tr[{}]/td[2]/text()'.format(i)).extract()
+                if row.xpath('boolean(td[2][@rowspan="2"])').extract_first()=='1':
+                    same_filer = 1
+                if row.xpath('boolean(td[3][@rowspan="2"])').extract_first()=='1':
+                    same_description=1
 
-                if table.xpath('tr[{}]/td[3]/p/text()'.format(i)).extract():
-                    description = table.xpath('tr[{}]/td[3]/p/text()'.format(i)).extract()
-                else:
-                    description = table.xpath('tr[{}]/td[3]/text()'.format(i)).extract()
+            elif row.xpath('count(td)=3 and not(td[1][@rowspan="2"]) and td[2][@rowspan="2"]').extract_first() == '1':
+                docket, filer, description = self.row_data(row, table)
+                if row.xpath('boolean(td[2][@rowspan="2"])').extract_first() == '1':
+                    same_filer = 1
 
-                item = {
-                'docket' : docket,
-                'filer' : filer,
-                'description' : description
-                }
-                yield item
+            elif row.xpath('count(td)=2 and not(td[1]/a[contains(@href, "docket")])').extract_first()=='1':
+                filer = row.xpath('td[1]/p/text()|td[1]/text()').extract()
+                description = row.xpath('td[2]/p/text()|td[2]/span/text()|td[2]/text()').extract()
 
-                if table.xpath('tr[{}]/td[2]'.format(i+1)).extract_first():
-                    if table.xpath('tr[{}]/td[1]/p/text()'.format(i+1)).extract():
-                        filer1 = table.xpath('tr[{}]/td[1]/p/text()'.format(i+1)).extract()
-                    else:
-                        filer1 = table.xpath('tr[{}]/td[1]/text()'.format(i+1)).extract()
+            elif row.xpath('count(td)=2 and td[1]/a[contains(@href, "docket")]').extract_first()=='1':
+                if same_filer==1:
+                    docket = row.xpath('td[1]/a/text()|td[1]/text()').extract()
+                    description = row.xpath('td[2]/text()').extract_first()
+                    same_filer = 0
 
-                    if table.xpath('tr[{}]/td[2]/p/text()'.format(i+1)).extract():
-                        description1 = table.xpath('tr[{}]/td[2]/p/text()'.format(i+1)).extract()
-                    else:
-                        description1 = table.xpath('tr[{}]/td[2]/text()'.format(i + 1)).extract()
-
-                    item = {
-                    'docket' : docket,
-                    'filer' : filer1,
-                    'description' : description1
-                    }
-                    yield item
-
-                else:
-                    if table.xpath('tr[{}]/td[@rowspan="2"][3]'.format(i)).extract_first():
-                        item = {
-                        'docket': docket,
-                        'filer': filer1,
-                        'description': description
-                        }
-                        yield item
-
-                    else:
-                        description2 = table.xpath('tr[{}]/td[1]/text()'.format(i+1)).extract_first()
-                        item = {
-                        'docket': docket,
-                        'filer': filer,
-                        'description': description2
-                        }
-                        yield item
             else:
-                if table.xpath('tr[{}]/td[3]'.format(i)).extract():
-                    if table.xpath('tr[{}]/td[1]/a/text()'.format(i)).extract():
-                        docket = table.xpath('tr[{}]/td[1]/a/text()'.format(i)).extract()
-                    else:
-                        docket = table.xpath('tr[{}]/td[1]/text()'.format(i)).extract()
+                if row.xpath('count(td)=1').extract_first()=='1':
+                    if same_description == 1:
+                        filer = row.xpath('td[1]/p/text()|td[1]/text()').extract()
+                        same_description = 0
 
-                    if table.xpath('tr[{}]/td[2]/p/text()'.format(i)).extract():
-                        filer = table.xpath('tr[{}]/td[2]/p/text()'.format(i)).extract()
-                    else:
-                        filer= table.xpath('tr[{}]/td[2]/text()'.format(i)).extract()
-
-                    if table.xpath('tr[{}]/td[3]/p/text()'.format(i)).extract():
-                        description = table.xpath('tr[{}]/td[3]/p/text()'.format(i)).extract()
-                    elif table.xpath('tr[{}]/td[3]/span/text()'.format(i)).extract():
-                        description = table.xpath('tr[{}]/td[3]/span/text()'.format(i)).extract()
-                    else:
-                        description = table.xpath('tr[{}]/td[3]/text()'.format(i)).extract()
-
-                    item = {
-                    'docket' : docket,
-                    'filer' : filer,
-                    'description' : description
-                    }
-                    yield item
+                    if same_filer == 1:
+                        description = row.xpath('td[1]/text()').extract_first()
+                        same_filer = 0
+            item = {
+                'docket': docket,
+                'filer': filer,
+                'description': description
+            }
+            yield item
