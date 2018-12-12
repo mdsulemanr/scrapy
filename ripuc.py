@@ -7,24 +7,24 @@ class RipucSpider(scrapy.Spider):
     allowed_domains = ['ripuc.org']
     start_urls = ['http://www.ripuc.org/eventsactions/docket.html']
 
-    def row_data(self, row, docket_talbe):
+    def row_data(self, row, docket_table):
         docket = row.xpath('td[1]/a/text()|td[1]/text()').extract()
         filer = row.xpath('td[2]/p/text()|td[2]/text()').extract()
         description = row.xpath('td[3]/p/text()|td[3]/span/text()|td[3]/text()').extract()
         return docket, filer, description
 
     def parse(self, response):
-        docket_talbe = response.xpath('//td[@class="normal"]/table')
+        docket_table = response.xpath('//td[@class="normal"]/table')
         same_filer = 0
         same_description = 0
-        for row in docket_talbe.xpath('tr')[1:]:
+        for row in docket_table.xpath('tr')[1:]:
             # Unique Docket, Filer and Description
             if row.xpath('count(td)=3 and not(td[1][@rowspan="2"]) and not(td[2][@rowspan="2"])').extract_first()=='1':
-                docket, filer, description = self.row_data(row, docket_talbe)
+                docket, filer, description = self.row_data(row, docket_table)
 
             # Dependent Docket and unique Filer and Description
             elif row.xpath('count(td)=3 and td[1][@rowspan="2"]').extract_first()=='1':
-                docket, filer, description = self.row_data(row, docket_talbe)
+                docket, filer, description = self.row_data(row, docket_table)
 
                 if row.xpath('boolean(td[2][@rowspan="2"])').extract_first()=='1':
                     same_filer = 1
@@ -32,7 +32,7 @@ class RipucSpider(scrapy.Spider):
                     same_description=1
 
             elif row.xpath('count(td)=3 and not(td[1][@rowspan="2"]) and td[2][@rowspan="2"]').extract_first() == '1':
-                docket, filer, description = self.row_data(row, docket_talbe)
+                docket, filer, description = self.row_data(row, docket_table)
                 if row.xpath('boolean(td[2][@rowspan="2"])').extract_first() == '1':
                     same_filer = 1
 
